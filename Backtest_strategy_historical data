@@ -1,0 +1,298 @@
+import the lib
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import plotly.graph_objs as go
+from m_Two618_indicators import cl_Two618_indicator
+from m_pivotpoint import cl_pivot_point
+import warnings
+warnings.filterwarnings("ignore")
+Instantiating the class
+# Pull support and resistance indicator from "indicators_m"
+indicator_support=cl_Two618_indicator.fn_william_vix_support
+indicator_resistance=cl_Two618_indicator.fn_william_vix_resistance
+support_resis_Fibonacci=cl_pivot_point.fn_Fibonacci
+file_name='FDAX 2013_2023 - 20210104.csv'
+time_frame="D" #5Min
+sample_entries=0
+
+# Date+time merging
+def fn_make_dataframe_spot(data_frame, time_period):
+    #print(data_frame)
+    df = data_frame.groupby(pd.Grouper(freq=time_period)).agg({"Date":"last", "Time": "last", "Open": "first", "High": "max", "Low": "min","Close": "last", "Volume":"sum", "Date1": "last", "Time1":"last", "DateTime1":"last"})                                                               
+    df=df.dropna()
+    #print(df)
+    return df
+​
+# creating class for main strategy
+class cl_WVF_strategy:
+    def __init__(self,file_name):
+        self.fn_fetch_data()
+        self.fn_data_conversion()
+   
+    def fn_fetch_data(self): # get data from CSV
+        
+        self.df = pd.read_csv(file_name)
+        return self.df
+    
+    def fn_data_conversion(self,time_frame=time_frame,sample_entries=sample_entries):#Date time merge
+        self.df["DateTime"] =  self.df["Date"] + " " +self.df["Time"] #+"+05:30"
+        self.df['DateTime'] = pd.to_datetime(self.df['DateTime'], format="%d-%m-%Y %H:%M:%S")
+        self.df['DateTime1'] = pd.to_datetime(self.df['DateTime'])
+        self.df = self.df.set_index('DateTime')
+        self.df_tf=fn_make_dataframe_spot(self.df, time_frame)
+        
+        if sample_entries==0:#fn_get_data_subset (data_frame,start_row,end_row)
+            self.df1=self.df_tf
+        else:
+            self.df1=self.df_tf[0:sample_entries]
+        return self.df1
+    
+WVF_Strategy_run=cl_WVF_strategy(file_name)
+raw_data=WVF_Strategy_run.fn_fetch_data()
+raw_data
+data_1Min=WVF_Strategy_run.fn_data_conversion(time_frame="1Min",sample_entries=0)
+data_1Min
+data_2Min=WVF_Strategy_run.fn_data_conversion(time_frame="2Min",sample_entries=0)
+data_2Min
+df_2=data_2Min[data_2Min['Date']=='28-03-2023']
+df_2
+data_5Min=WVF_Strategy_run.fn_data_conversion(time_frame="5Min",sample_entries=0)
+data_5Min
+data_15Min=WVF_Strategy_run.fn_data_conversion(time_frame="15Min",sample_entries=0)
+data_15Min
+data_30Min=WVF_Strategy_run.fn_data_conversion(time_frame="30Min",sample_entries=0)
+data_30Min
+data_60Min=WVF_Strategy_run.fn_data_conversion(time_frame="60Min",sample_entries=0)
+data_60Min
+data_120Min=WVF_Strategy_run.fn_data_conversion(time_frame="120Min",sample_entries=0)
+data_120Min
+data_D=WVF_Strategy_run.fn_data_conversion(time_frame="D",sample_entries=0)
+data_D
+#creating support and resistance
+support_df=indicator_support(data_60Min,look_back_Bollinger=20,look_back_William_Vix=22,multiplier=2,look_back_range=50,percentage_high=0.85,percentage_low=1.01)
+support_df
+#support_df.to_csv('support.csv')
+resistance_df=indicator_resistance(data_60Min,look_back_Bollinger=20,look_back_William_Vix=20,multiplier=2,threshold_resistance=0.5)
+resistance_df
+#resistance_df.to_csv("resistance.csv") 
+Plot the graph
+import pandas as pd
+import mplfinance as mpf
+​
+import matplotlib.dates as mdates
+kwargs = dict(type='candle',mav=(2,4,6),volume=True,figratio=(11,8),figscale=0.85)
+df = support_df[-10:-1]
+df.index.name='Date'
+df.dropna(inplace=True)
+mpf.plot(df,**kwargs,style='charles')
+apds = [mpf.make_addplot(df['wvf_support'],type='bar',panel=2,color=['lime' if x=='lime' else 'gray' for x in df['wvf_support_signal']] ,ylim=(0,1),secondary_y=True)]
+mpf.plot(df,**kwargs,style='charles',addplot=apds,panel_ratios=(7,5),savefig='support.png')
+Plotting to PDF Method 1
+import matplotlib
+from matplotlib.backends.backend_pdf import PdfPages
+import time
+from datetime import datetime as dt
+#from PyPDF2 import PdfMerger
+with PdfPages('daily_candle_charts_2021_2023.pdf') as pdf:  
+    #print('IN With')
+    data_2Min=support_df[-254:]
+    pdf_files=[]
+    for i in data_2Min.index:
+        #print('IN For')  
+       
+        temp_df = data_2Min[data_2Min['Date']==data_2Min['Date'][i]]
+        #print('temp_df1: ',temp_df)
+        
+        if temp_df['Date'][i] != temp_df['Date'].shift(1)[i]:
+            
+​
+            from IPython.display import clear_output
+            clear_output(wait=True)      
+            print('1:', temp_df['Date'][i],temp_df['Time'][i])
+            #print('temp_df3: ',temp_df)
+            #print('2: ',temp_df['Date'][i],temp_df['Time'][i])
+​
+            df = temp_df #DAX_30min_sample_df_chart #pd.read_csv('stock_data.csv', index_col='Date', parse_dates=True)
+            
+            #fig = 'fig_' + str(dt.strptime(temp_df['Date'][i], '%d-%m-%Y').date() ) 
+            #print('fig: ',fig)
+            fig = plt.figure()
+            plt.rcParams["figure.figsize"] = [25, 10]
+            plt.rcParams["figure.autolayout"] = True
+​
+            fig, ax = plt.subplots(2,1)
+            ax[0].plot(df.Time, df.Close, 'b.-') 
+            y1,y2,y3,y4,y5,y6=support_resis_Fibonacci(df)[[1,2,3,4,5,6]]
+            ax[0].axhline(y1, color='red', linestyle='dashed',label='S1')
+            ax[0].axhline(y2, color='red', linestyle='dashed',label='S2')
+            ax[0].axhline(y3, color='red', linestyle='dashed',label='S3')
+            ax[0].axhline(y4, color='green', linestyle='dashed',label='r1')
+            ax[0].axhline(y5, color='green', linestyle='dashed',label='r2')
+            ax[0].axhline(y6, color='green', linestyle='dashed',label='r3')
+            ax[1].bar(df.Time,df.wvf_support,color= ["lime" if x=='lime' else 'gray' for x in df['wvf_support_signal']])
+            plt.title('DAX Price Plot - ' + temp_df['Date'][i], fontdict={'fontweight': 'bold','fontsize':18})
+            ax[0].set_ylabel('Close Price', size=20) # in inches not pixels
+            ax[1].set_ylabel('Support', size=20) # in inches not pixels
+            
+            plt.xlabel('Time (UTC)', size=20)
+         
+            matplotlib.rcParams['legend.fontsize'] = 25
+            plt.xticks(fontsize=20)
+            plt.yticks(fontsize=20)
+            plt.legend()
+            pdf.savefig()
+            plt.show()    
+            time.sleep(10)
+​
+​
+
+    for i in data_2Min.index:
+import matplotlib
+from matplotlib.backends.backend_pdf import PdfPages
+import time
+from datetime import datetime as dt
+from PyPDF2 import PdfMerger
+with PdfPages('daily_candle_charts_2021_2023.pdf') as pdf:  
+    #print('IN With')
+    data_2Min=resistance_df[-254:]
+    pdf_files=[]
+    for i in data_2Min.index:
+        #print('IN For')  
+       
+        temp_df = data_2Min[data_2Min['Date']==data_2Min['Date'][i]]
+        #print('temp_df1: ',temp_df)
+        
+        if temp_df['Date'][i] != temp_df['Date'].shift(1)[i]:
+            
+​
+            from IPython.display import clear_output
+            clear_output(wait=True)      
+            print('1:', temp_df['Date'][i],temp_df['Time'][i])
+            #print('temp_df3: ',temp_df)
+            #print('2: ',temp_df['Date'][i],temp_df['Time'][i])
+​
+            df = temp_df #DAX_30min_sample_df_chart #pd.read_csv('stock_data.csv', index_col='Date', parse_dates=True)
+            
+            #fig = 'fig_' + str(dt.strptime(temp_df['Date'][i], '%d-%m-%Y').date() ) 
+            #print('fig: ',fig)
+            fig = plt.figure()
+            plt.rcParams["figure.figsize"] = [30, 13]
+            plt.rcParams["figure.autolayout"] = True
+​
+            fig, ax = plt.subplots(2,1)
+            ax[0].plot(df.Time, df.Close, 'b.-')
+            support_resis_Fibonacci(df)
+            y1,y2,y3,y4,y5,y6=support_resis_Fibonacci(df)[[1,2,3,4,5,6]]
+            ax[0].axhline(y1, color='red', linestyle='dashed',label='S1')
+            ax[0].axhline(y2, color='red', linestyle='dashed',label='S2')
+            ax[0].axhline(y3, color='red', linestyle='dashed',label='S3')
+            ax[0].axhline(y4, color='green', linestyle='dashed',label='r1')
+            ax[0].axhline(y5, color='green', linestyle='dashed',label='r2')
+            ax[0].axhline(y6, color='green', linestyle='dashed',label='r3')
+            ax[1].bar(df.Time,df.wvf_resistance,color= ["red" if x=='red' else 'orange' if x=='orange' else 'gray' for x in df['wvf_resistance_signal']])
+            plt.title('DAX Price Plot - ' + temp_df['Date'][i], fontdict={'fontweight': 'bold','fontsize':18})
+            ax[0].set_ylabel('Close Price', size=20) # in inches not pixels
+            ax[1].set_ylabel('Resistance', size=20) # in inches not pixels
+            
+            plt.xlabel('Time (UTC)', size=20)
+         
+            matplotlib.rcParams['legend.fontsize'] = 25
+            plt.xticks(fontsize=20)
+            plt.yticks(fontsize=20)
+            plt.legend()
+            pdf.savefig()
+            plt.show()    
+            time.sleep(10)
+Plotting to PDF (with volume)
+Support
+from matplotlib.backends.backend_pdf import PdfPages
+import time
+from datetime import datetime as dt
+from PyPDF2 import PdfMerger
+​
+data_2Min=resistance_df[-2289:]
+pdf_files=[]
+for i in data_2Min.index:
+    #print('IN For')  
+​
+    temp_df = data_2Min[data_2Min['Date']==data_2Min['Date'][i]]
+    #print('temp_df1: ',temp_df)
+​
+    if temp_df['Date'][i] != temp_df['Date'].shift(1)[i]:
+​
+​
+        from IPython.display import clear_output
+        clear_output(wait=True)      
+        print('1:', temp_df['Date'][i],temp_df['Time'][i])
+​
+​
+        df = temp_df #DAX_30min_sample_df_chart #pd.read_csv('stock_data.csv', index_col='Date', parse_dates=True)
+​
+​
+        fig = plt.figure()
+        plt.rcParams["figure.figsize"] = [30, 13]
+        plt.rcParams["figure.autolayout"] = True
+​
+​
+        title_s='Support '+str(dt.strptime(temp_df['Date'][i], '%d-%m-%Y').date())
+        apds = [mpf.make_addplot(df['wvf_resistance'],type='bar',panel=2,color=['red' if x=='red' else 'orange' if x=='orange' else 'gray' for x in df['wvf_resistance_signal']] ,ylim=(0,1),secondary_y=True)]
+        mpf.plot(df,type='candle',style='charles',volume=True,figscale=1.5,title=title_s,addplot=apds,panel_ratios=(7,5),savefig='Support '+str(dt.strptime(temp_df['Date'][i], '%d-%m-%Y').date())+'.pdf')
+        pdf_files.append(title_s+'.pdf')   
+        time.sleep(10)
+​
+merger = PdfMerger()
+for pdf_file in pdf_files:
+    #Append PDF files
+    merger.append(pdf_file)
+​
+#Write out the merged PDF file
+merger.write("Support_file.pdf")
+merger.close()
+Resistance
+df_resistance = resistance_df[-2289:-1]
+df_resistance.index.name='Date'
+df_resistance.dropna(inplace=True)
+from matplotlib.backends.backend_pdf import PdfPages
+import time
+from datetime import datetime as dt
+from PyPDF2 import PdfMerger
+​
+data_2Min=support_df[-2289:]
+pdf_files=[]
+for i in data_2Min.index:
+    #print('IN For')  
+​
+    temp_df = data_2Min[data_2Min['Date']==data_2Min['Date'][i]]
+    #print('temp_df1: ',temp_df)
+​
+    if temp_df['Date'][i] != temp_df['Date'].shift(1)[i]:
+​
+​
+        from IPython.display import clear_output
+        clear_output(wait=True)      
+        print('1:', temp_df['Date'][i],temp_df['Time'][i])
+​
+​
+        df = temp_df #DAX_30min_sample_df_chart #pd.read_csv('stock_data.csv', index_col='Date', parse_dates=True)
+​
+​
+        fig = plt.figure()
+        plt.rcParams["figure.figsize"] = [30, 13]
+        plt.rcParams["figure.autolayout"] = True
+​
+​
+        title_s='Support '+str(dt.strptime(temp_df['Date'][i], '%d-%m-%Y').date())
+        apds = [mpf.make_addplot(df['wvf_support'],type='bar',panel=2,color=['lime' if x=='lime' else 'gray' for x in df['wvf_support_signal']] ,ylim=(0,1),secondary_y=True)]
+        mpf.plot(df,type='candle',style='charles',volume=True,figscale=1.5,title=title_s,addplot=apds,panel_ratios=(7,5),savefig='Resistance '+str(dt.strptime(temp_df['Date'][i], '%d-%m-%Y').date())+'.pdf')
+        pdf_files.append(title_s+'.pdf')   
+        time.sleep(10)
+​
+merger = PdfMerger()
+for pdf_file in pdf_files:
+    #Append PDF files
+    merger.append(pdf_file)
+​
+#Write out the merged PDF file
+merger.write("Resistance_file.pdf")
+merger.close()
