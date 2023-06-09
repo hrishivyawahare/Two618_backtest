@@ -1,0 +1,70 @@
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import os
+from datetime import date,timedelta
+import warnings
+warnings.filterwarnings("ignore")
+import time
+from m_Two618_indicators import cl_Two618_indicator,cl_pivot_point
+from m_pivotpoint import cl_pivot_point
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import matplotlib
+from IPython.display import clear_output
+
+# importing function from
+indicator_support=cl_Two618_indicator.fn_william_vix_support
+indicator_resistance=cl_Two618_indicator.fn_william_vix_resistance
+support_resis_Fibonacci=cl_pivot_point.fn_Fibonacci
+support_resis_Standard=cl_pivot_point.fn_Standard
+# Create ticker list which needs to be checked
+tickers_list=['^NSEI','^NSEBANK','AXISBANK.NS','HCLTECH.NS','HDFC.NS','HDFCBANK.NS','HEROMOTOCO.NS','INFY.NS']
+
+# Data pulling from yahoo finance
+def read_data(ticker):
+    data_ohlc=pd.DataFrame(yf.download(ticker, period="2d", interval="5m"))
+    return data_ohlc
+# Iterate for every 10 seconds
+while(True):
+    for ticker in tickers_list:
+        data_ohlc= read_data(ticker)
+        print(ticker)
+        
+        # Generate support dataframe to plot
+        support_df=indicator_support(data_ohlc,look_back_Bollinger=22,look_back_William_Vix=20,multiplier=2,look_back_range=20,percentage_high=0.85,percentage_low=1.01)
+        
+        # Define chart parameters
+        df_s = support_df[-72:-1]
+        df_s.index.name='Datetime'
+        df_s.dropna(inplace=False)
+        fig = plt.figure()
+        plt.rcParams["figure.figsize"] = [25, 10]
+        plt.rcParams["figure.autolayout"] = True
+        
+        # Create line graph and draw pivot Support and resistance
+        fig, ax = plt.subplots(1,1)
+        ax.plot(df_s.index, df_s.Close, 'b.-') 
+        y1,y2,y3,y4,y5,y6=support_resis_Fibonacci(df_s)[[1,2,3,4,5,6]]
+        ax.axhline(y1, color='red', linestyle='dashed')
+        ax.axhline(y2, color='red', linestyle='dashed')
+        ax.axhline(y3, color='red', linestyle='dashed')
+        ax.axhline(y4, color='green', linestyle='dashed')
+        ax.axhline(y5, color='green', linestyle='dashed')
+        ax.axhline(y6, color='green', linestyle='dashed') 
+        
+        # Format chart
+        plt.title(ticker +' Price Plot' , fontdict={'fontweight': 'bold','fontsize':18})
+        ax.set_ylabel('Close Price', size=20) # in inches not pixels
+        plt.xlabel('Time (UTC)', size=20)
+        matplotlib.rcParams['legend.fontsize'] = 25
+        plt.xticks(fontsize=20)
+        plt.yticks(fontsize=20)
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+        time.sleep(10)
+        clear_output(wait=False)
+     
+    time.sleep(5)
+    clear_output(wait=False)
