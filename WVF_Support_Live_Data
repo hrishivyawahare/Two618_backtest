@@ -1,0 +1,64 @@
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import os
+from datetime import date,timedelta
+import warnings
+warnings.filterwarnings("ignore")
+import time
+from m_Two618_indicators import cl_Two618_indicator
+from m_pivotpoint import cl_pivot_point
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import matplotlib
+from IPython.display import clear_output
+
+# import function from Indicator module
+indicator_support=cl_Two618_indicator.fn_william_vix_support
+indicator_resistance=cl_Two618_indicator.fn_william_vix_resistance
+# Create ticker list which needs to be checked
+tickers_list=['^NSEI','^NSEBANK','AXISBANK.NS','HCLTECH.NS','HDFC.NS','HDFCBANK.NS','HEROMOTOCO.NS','INFY.NS']
+
+# Data pulling from yahoo finance
+def read_data(ticker):
+    data_ohlc=pd.DataFrame(yf.download(ticker, period="2d", interval="5m"))
+    return data_ohlc
+
+# Iterate for every 10 seconds
+while(True):
+    for ticker in tickers_list:
+        data_ohlc= read_data(ticker)
+        print(ticker)
+        
+        # Generate support dataframe to plot
+        support_df=indicator_support(data_ohlc,look_back_Bollinger=22,look_back_William_Vix=20,multiplier=2,look_back_range=20,percentage_high=0.85,percentage_low=1.01)
+        
+        # Define chart parameters
+        df_s = support_df[-72:-1]
+        df_s.index.name='Datetime'
+        df_s.dropna(inplace=False)
+        fig = plt.figure()
+        plt.rcParams["figure.figsize"] = [25, 10]
+        plt.rcParams["figure.autolayout"] = True
+        
+        # Create subplots for line graph and bar graph
+        fig, ax = plt.subplots(2,1)
+        ax[0].plot(df_s.index, df_s.Close, 'b.-')  
+        ax[1].bar(df_s.index,df_s.wvf_support,color=["lime" if x=='lime' else 'gray' for x in df_s['wvf_support_signal']],width=0.0005)
+        
+        # Format chart
+        plt.title(ticker +' Price Plot' , fontdict={'fontweight': 'bold','fontsize':18})
+        ax[0].set_ylabel('Close Price', size=20) # in inches not pixels
+        ax[1].set_ylabel('Support', size=20) # in inches not pixels
+        plt.xlabel('Time (UTC)', size=20)
+        matplotlib.rcParams['legend.fontsize'] = 25
+        plt.xticks(fontsize=20)
+        plt.yticks(fontsize=20)
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+        time.sleep(10)
+        clear_output(wait=False)
+     
+    time.sleep(5)
+    clear_output(wait=False)
